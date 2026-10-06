@@ -6,7 +6,7 @@ import LoginCard from './components/LoginCard'
 import RegisterForm from './components/RegisterForm'
 
 function App() {
-  const [activeSection, setActiveSection] = useState('login')
+  const [activeSection, setActiveSection] = useState('dashboard')
   const [theme, setTheme] = useState('dark')
   const [user, setUser] = useState({
     name: 'user',

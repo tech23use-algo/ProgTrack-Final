@@ -1,6 +1,6 @@
-# GoalTrack
+# ProgTrack
 
-GoalTrack is a goal-tracking web application built using React.js.
+ProgTrack is a goal-tracking web application 
 
 The current version contains the frontend interfaces for:
 - Registration
