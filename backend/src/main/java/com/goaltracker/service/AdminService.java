@@ -1,0 +1,20 @@
+package com.goaltracker.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.goaltracker.dto.Requests;
+import com.goaltracker.dto.Responses;
+import com.goaltracker.model.AuditLog;
+import com.goaltracker.model.Role;
+import com.goaltracker.model.User;
+import com.goaltracker.repository.AuditLogRepository;
+import com.goaltracker.repository.GoalRepository;
+import com.goaltracker.repository.UserRepository;
+@Service public class AdminService {private final UserRepository users;private final GoalRepository goals;private final AuditLogRepository audit;private final PasswordEncoder encoder;private final AiUsageService usage;public AdminService(UserRepository u,GoalRepository g,AuditLogRepository a,PasswordEncoder e,AiUsageService usage){users=u;goals=g;audit=a;encoder=e;this.usage=usage;}private User actor(String e){return users.findByEmail(e).orElseThrow();}public Page<Responses.UserSummary> users(String search,Role role,int page){List<User> all=search==null||search.isBlank()?users.findAll():users.findByEmailContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(search,search);if(role!=null)all=all.stream().filter(u->u.getRole()==role).toList();int from=Math.min(page*20,all.size()),to=Math.min(from+20,all.size());return new org.springframework.data.domain.PageImpl<>(all.subList(from,to),PageRequest.of(page,20),all.size()).map(this::summary);}public Responses.UserSummary create(String email,Requests.AdminUser r){if(users.existsByEmail(r.email()))throw new IllegalArgumentException("Email is already registered");var u=users.save(new User(r.email().toLowerCase(),encoder.encode(r.password()),r.displayName(),r.role()==null?Role.USER:r.role()));log(actor(email),"CREATE_USER",u.getId());return summary(u);}public void role(String actorEmail,Long id,Requests.RoleChange r){var u=user(id);u.setRole(r.role());users.save(u);log(actor(actorEmail),"CHANGE_ROLE",id);}public void status(String actorEmail,Long id,Requests.StatusChange r){var u=user(id);u.setActive(r.active());users.save(u);log(actor(actorEmail),r.active()?"ACTIVATE_USER":"DEACTIVATE_USER",id);}public void manager(String actorEmail,Long id,Requests.ManagerChange r){var u=user(id);if(r.managerId()!=null&&!users.findById(r.managerId()).map(x->x.getRole()==Role.MANAGER).orElse(false))throw new IllegalArgumentException("Manager not found");u.setManagerId(r.managerId());users.save(u);log(actor(actorEmail),"ASSIGN_MANAGER",id);}public void delete(String actorEmail,Long id){users.delete(user(id));log(actor(actorEmail),"DELETE_USER",id);}public Responses.AdminStats stats(){var all=goals.findAll().stream().map(Responses.GoalView::from).toList();return new Responses.AdminStats(users.findByRole(Role.USER).size(),users.findByRole(Role.MANAGER).size(),users.findByRole(Role.ADMIN).size(),all.size(),all.stream().mapToDouble(Responses.GoalView::completion).average().orElse(0));}public List<Map<String,Object>> usage(){return usage.summary();}public List<Responses.AuditView> audit(){return audit.findAllByOrderByTimestampDesc(PageRequest.of(0,200)).stream().map(x->new Responses.AuditView(x.getId(),x.getActorId(),x.getAction(),x.getTargetId(),x.getTimestamp())).toList();}private User user(Long id){return users.findById(id).orElseThrow(()->new NoSuchElementException("User not found"));}private Responses.UserSummary summary(User u){var gs=goals.findByUserIdOrderByTargetDateAsc(u.getId()).stream().map(Responses.GoalView::from).toList();return new Responses.UserSummary(u.getId(),u.getEmail(),u.getDisplayName(),u.getRole(),u.isActive(),u.getManagerId(),u.getCreatedAt(),gs.stream().mapToDouble(Responses.GoalView::completion).average().orElse(0),gs.size());}private void log(User a,String action,Long target){audit.save(new AuditLog(a.getId(),action,target));}}
