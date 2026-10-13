@@ -1,0 +1,14 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: goal_tracker
+      MYSQL_ROOT_PASSWORD: goal_tracker_dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - goal_tracker_mysql:/var/lib/mysql
+
+volumes:
+  goal_tracker_mysql:

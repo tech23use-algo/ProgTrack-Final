@@ -1,0 +1,1 @@
+-- Hibernate creates and updates the schema in local development.
